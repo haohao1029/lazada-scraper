@@ -79,7 +79,7 @@ const scraperObject = {
         await itemPage.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
         console.log(`Navigating to ` + itemLink);
         try {
-          this.getProductDetails(itemPage, totalData);
+          this.getProductDetails(browser, itemPage, totalData);
         } catch (err) {
           console.log(itemLink);
           console.log(err);
@@ -124,8 +124,10 @@ const scraperObject = {
         return false;
       });
   },
-  async getProductDetails(page, totalData) {
-    // await page.goto(itemLink, { waitUntil: "domcontentloaded" });
+  async getProductDetails(browser, page, totalData) {
+    // waiter not exceed 10 pages
+    while ((await browser.pages()).length >= 10) {}
+
     await page.goto(itemLink, { waitUntil: "networkidle0", timeout: 0 });
     while (this.isCaptcha) {
       console.log("captcha detected");
@@ -145,7 +147,6 @@ const scraperObject = {
       if (document.querySelector(".sku-name")) {
         modelName = document.querySelector(".sku-name").innerText;
       }
-
       data = {
         title,
         rating,
