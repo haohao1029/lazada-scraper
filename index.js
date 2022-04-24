@@ -61,7 +61,11 @@ const scraperObject = {
       return productItemUrls;
     });
 
-    for (currentPage = currentPage + 1; currentPage <= 2; currentPage++) {
+    for (
+      currentPage = currentPage + 1;
+      currentPage <= lastPage;
+      currentPage++
+    ) {
       itemLinks = await page.evaluate(() => {
         const productItemUrls = Array.from(
           document.querySelectorAll(".Bm3ON .Ms6aG .qmXQo ._95X4G a"),
@@ -69,19 +73,24 @@ const scraperObject = {
         );
         return productItemUrls;
       });
-      for (i = 0; i < 1; i++) {
+      for (i = 0; i < itemLinks.length; i++) {
         itemLink = itemLinks[i];
         itemPage = await browser.newPage();
         await itemPage.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
         console.log(`Navigating to ` + itemLink);
-
-        this.getProductDetails(itemPage, totalData);
+        try {
+          this.getProductDetails(itemPage, totalData);
+        } catch (err) {
+          console.log(itemLink);
+          console.log(err);
+        }
       }
       await page.goto(
         `https://www.lazada.com.my/lucky-pharmacy-malaysia/?from=wangpu&langFlag=en&page=${currentPage}&pageTypeId=2&q=All-Products`,
         { waitUntil: "domcontentloaded" }
       );
     }
+
     fs.writeFile("items.json", JSON.stringify(totalData), (err) => {
       if (err) {
         throw err;
@@ -106,10 +115,9 @@ const scraperObject = {
   },
   async isCaptcha(page) {
     console.log("checking captcha");
-    const captcha = page
+    page
       .$$("#nocaptcha")
       .then((captcha) => {
-        console.log(captcha);
         return true;
       })
       .catch((error) => {
@@ -117,51 +125,53 @@ const scraperObject = {
       });
   },
   async getProductDetails(page, totalData) {
-    try {
-      await page.goto(itemLink, { waitUntil: "networkidle2" });
-      await page.evaluate(() => {
-        const title = document.querySelector(
-          ".pdp-mod-product-badge-title"
-        ).innerText;
-        const rating = document
-          .querySelector(".pdp-review-summary__link")
-          .innerText.split(" ")[0];
-        let price = document.querySelector(".pdp-price").innerText;
-        let model = "";
-        if (document.querySelector(".sku-name")) {
-          model = document.querySelector(".sku-name").innerText;
-        }
-
-        data = {
-          title: title ? title : "",
-          rating: rating ? rating : "",
-          price: price,
-          modelName: modelName,
-        };
-        totalData.push(data);
-
-        const modelBtns = document.querySelectorAll(".sku-variable-img-wrap");
-        const modelLength = modelBtns.length;
-        for (let i = 0; i < modelLength; i++) {
-          const modelBtn = modelBtns[i];
-          modelBtn.click();
-          const modelName = modelBtn.querySelector(".sku-name").innerText;
-          const price = modelBtn.querySelector(".pdp-price").innerText;
-          data = {
-            title: title ? title : "",
-            rating: rating ? rating : "",
-            price: price,
-            modelName: modelName,
-          };
-          totalData.push(data);
-        }
-
-      });
-    } catch (err) {
-      // page.close();
-      // this.getProductDetails(page, totalData);
+    // await page.goto(itemLink, { waitUntil: "domcontentloaded" });
+    await page.goto(itemLink, { waitUntil: "networkidle0", timeout: 0 });
+    while (this.isCaptcha) {
+      console.log("captcha detected");
+      console.log("itemLink = " + itemLink);
+      await page.reload({ waitUntil: "networkidle0", timeout: 0 });
     }
-    // page.close();
+    const dataItem = await page.evaluate(() => {
+      let itemData = [];
+      const title = document.querySelector(
+        ".pdp-mod-product-badge-title"
+      ).innerText;
+      const rating = document
+        .querySelector(".pdp-review-summary__link")
+        .innerText.split(" ")[0];
+      let price = document.querySelector(".pdp-price").innerText;
+      let modelName = "";
+      if (document.querySelector(".sku-name")) {
+        modelName = document.querySelector(".sku-name").innerText;
+      }
+
+      data = {
+        title,
+        rating,
+        price,
+        modelName,
+      };
+      itemData.push(data);
+      const modelBtns = document.querySelectorAll(".sku-variable-img-wrap");
+      const modelLength = modelBtns.length;
+      for (let i = 0; i < modelLength; i++) {
+        const modelBtn = modelBtns[i];
+        modelBtn.click();
+        const modelName = document.querySelector(".sku-name").innerText;
+        const price = document.querySelector(".pdp-price").innerText;
+        data = {
+          title,
+          rating,
+          price,
+          modelName,
+        };
+        itemData.push(data);
+      }
+      return itemData;
+    });
+    page.close();
+    totalData.push(...dataItem);
     return totalData;
   },
 };
