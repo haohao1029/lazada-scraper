@@ -61,11 +61,7 @@ const scraperObject = {
       return productItemUrls;
     });
 
-    for (
-      currentPage = currentPage + 1;
-      currentPage <= lastPage;
-      currentPage++
-    ) {
+    for (currentPage = currentPage + 1; currentPage <= 2; currentPage++) {
       itemLinks = await page.evaluate(() => {
         const productItemUrls = Array.from(
           document.querySelectorAll(".Bm3ON .Ms6aG .qmXQo ._95X4G a"),
@@ -73,20 +69,30 @@ const scraperObject = {
         );
         return productItemUrls;
       });
-      for (i = 0; i < itemLinks.length; i++) {
+      for (i = 0; i < 1; i++) {
         itemLink = itemLinks[i];
         itemPage = await browser.newPage();
         await itemPage.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
-        await itemPage.goto(itemLink, { waitUntil: "domcontentloaded" });
         console.log(`Navigating to ` + itemLink);
-        await this.getProductDetails(itemPage, totalData);
-        await itemPage.close();
+
+        this.getProductDetails(itemPage, totalData);
       }
       await page.goto(
         `https://www.lazada.com.my/lucky-pharmacy-malaysia/?from=wangpu&langFlag=en&page=${currentPage}&pageTypeId=2&q=All-Products`,
         { waitUntil: "domcontentloaded" }
       );
     }
+    fs.writeFile("items.json", JSON.stringify(totalData), (err) => {
+      if (err) {
+        throw err;
+      }
+    });
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(totalData);
+    xlsx.utils.book_append_sheet(wb, ws);
+    xlsx.writeFile(wb, "items.xlsx");
+
     console.log("end scrapping item");
   },
   randomIntFromInterval(min, max) {
@@ -111,36 +117,52 @@ const scraperObject = {
       });
   },
   async getProductDetails(page, totalData) {
-    const dataOfItem = await page.evaluate(() => {
-      const title = document.querySelector(
-        ".pdp-mod-product-badge-title"
-      ).innerText;
-      const rating = document
-        .querySelector(".pdp-review-summary__link")
-        .innerText.split(" ")[0];
-      let price = document.querySelector(".pdp-price").innerText;
-      //if sku-prop-content is not found, it will return 0
-      // milisecond = this.randomIntFromInterval(2,5) * 1000;
-      // this.sleep(milisecond);
-      let modelName = "";
-      if (document.querySelector(".sku-name")) {
-        modelName = document.querySelector(".sku-name").innerText;
-      }
-      console.log(modelName);
+    try {
+      await page.goto(itemLink, { waitUntil: "networkidle2" });
+      await page.evaluate(() => {
+        const title = document.querySelector(
+          ".pdp-mod-product-badge-title"
+        ).innerText;
+        const rating = document
+          .querySelector(".pdp-review-summary__link")
+          .innerText.split(" ")[0];
+        let price = document.querySelector(".pdp-price").innerText;
+        let model = "";
+        if (document.querySelector(".sku-name")) {
+          model = document.querySelector(".sku-name").innerText;
+        }
 
-      return {
-        title: title ? title : "",
-        rating: rating ? rating : "",
-        price: price,
-      };
-    });
-    totalData.push(dataOfItem);
+        data = {
+          title: title ? title : "",
+          rating: rating ? rating : "",
+          price: price,
+          modelName: modelName,
+        };
+        totalData.push(data);
 
-    fs.writeFile("items.json", JSON.stringify(totalData), (err) => {
-      if (err) {
-        throw err;
-      }
-    });
+        const modelBtns = document.querySelectorAll(".sku-variable-img-wrap");
+        const modelLength = modelBtns.length;
+        for (let i = 0; i < modelLength; i++) {
+          const modelBtn = modelBtns[i];
+          modelBtn.click();
+          const modelName = modelBtn.querySelector(".sku-name").innerText;
+          const price = modelBtn.querySelector(".pdp-price").innerText;
+          data = {
+            title: title ? title : "",
+            rating: rating ? rating : "",
+            price: price,
+            modelName: modelName,
+          };
+          totalData.push(data);
+        }
+
+      });
+    } catch (err) {
+      // page.close();
+      // this.getProductDetails(page, totalData);
+    }
+    // page.close();
+    return totalData;
   },
 };
 
