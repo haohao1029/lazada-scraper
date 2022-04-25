@@ -41,6 +41,7 @@ const scraperObject = {
     let currentPage = 1;
     let url = `https://www.lazada.com.my/lucky-pharmacy-malaysia/?from=wangpu&langFlag=en&page=${currentPage}&pageTypeId=2&q=All-Products`;
     let totalData = [];
+    let failedUrl = [];
     //opening browser & going to url
     let page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
@@ -80,9 +81,11 @@ const scraperObject = {
         console.log(`Navigating to ` + itemLink);
         try {
           this.getProductDetails(browser, itemPage, totalData);
+          await this.sleep(10000);
         } catch (err) {
-          console.log(itemLink);
-          console.log(err);
+          failedUrl.push({
+            itemLink,
+          });
         }
       }
       await page.goto(
@@ -96,7 +99,12 @@ const scraperObject = {
         throw err;
       }
     });
-
+    fs.writeFile("failedUrl.json", JSON.stringify(failedUrl), (err) => {
+      if (err) {
+        throw err;
+      }
+    });
+    
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.json_to_sheet(totalData);
     xlsx.utils.book_append_sheet(wb, ws);
@@ -115,23 +123,25 @@ const scraperObject = {
   },
   async isCaptcha(page) {
     console.log("checking captcha");
-    page
-      .$$("#nocaptcha")
-      .then((captcha) => {
-        return true;
-      })
-      .catch((error) => {
-        return false;
-      });
+    const isCaptcha = await page.evaluate(() => {
+      return document.getElementById("nocaptcha");
+    });
+    if (isCaptcha != null) {
+      return true;
+    }
+    return false;
   },
   async getProductDetails(browser, page, totalData) {
     // waiter not exceed 10 pages
-    while ((await browser.pages()).length >= 10) {}
+    console.log((await browser.pages()).length);
+    while ((await browser.pages()).length >= 10) {
+      await this.sleep(10000);
+    }
 
     await page.goto(itemLink, { waitUntil: "networkidle0", timeout: 0 });
-    while (this.isCaptcha) {
+
+    while (await this.isCaptcha(page)) {
       console.log("captcha detected");
-      console.log("itemLink = " + itemLink);
       await page.reload({ waitUntil: "networkidle0", timeout: 0 });
     }
     const dataItem = await page.evaluate(() => {
