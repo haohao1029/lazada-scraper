@@ -47,52 +47,16 @@ const scraperObject = {
     await page.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
     await page.goto(url, { waitUntil: "domcontentloaded" });
     console.log(`Navigating to ` + url);
-    console.log("page evaluate");
-
+    // Get last page number
     const lastPage = await page.evaluate(() => {
       paginationBtns = document.querySelectorAll(".ant-pagination-item");
       return paginationBtns[paginationBtns.length - 1].innerText; // last page
     });
-
-    itemLinks = await page.evaluate(() => {
-      const productItemUrls = Array.from(
-        document.querySelectorAll(".Bm3ON .Ms6aG .qmXQo ._95X4G a"),
-        (element) => element.href
-      );
-      return productItemUrls;
-    });
-
-    for (
-      currentPage = currentPage + 1;
-      currentPage <= lastPage;
-      currentPage++
-    ) {
-      itemLinks = await page.evaluate(() => {
-        const productItemUrls = Array.from(
-          document.querySelectorAll(".Bm3ON .Ms6aG .qmXQo ._95X4G a"),
-          (element) => element.href
-        );
-        return productItemUrls;
-      });
-      for (i = 0; i < itemLinks.length; i++) {
-        itemLink = itemLinks[i];
-        itemPage = await browser.newPage();
-        await itemPage.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
-        console.log(`Navigating to ` + itemLink);
-        try {
-          this.getProductDetails(browser, itemPage, totalData);
-          await this.sleep(10000);
-        } catch (err) {
-          failedUrl.push({
-            itemLink,
-          });
-        }
-      }
-      await page.goto(
-        `https://www.lazada.com.my/lucky-pharmacy-malaysia/?from=wangpu&langFlag=en&page=${currentPage}&pageTypeId=2&q=All-Products`,
-        { waitUntil: "domcontentloaded" }
-      );
-    }
+    console.log("start scraping");
+    totalData = await this.scrapePage(page, browser, currentPage, lastPage, totalData);
+    console.log(totalData)
+    console.log("scraping done");
+    console.log("import into files");
 
     fs.writeFile("items.json", JSON.stringify(totalData), (err) => {
       if (err) {
@@ -104,13 +68,13 @@ const scraperObject = {
         throw err;
       }
     });
-    
+
     const wb = xlsx.utils.book_new();
     const ws = xlsx.utils.json_to_sheet(totalData);
     xlsx.utils.book_append_sheet(wb, ws);
     xlsx.writeFile(wb, "items.xlsx");
 
-    console.log("end scrapping item");
+    console.log("end program");
   },
   randomIntFromInterval(min, max) {
     // min and max included
@@ -183,6 +147,37 @@ const scraperObject = {
     });
     page.close();
     totalData.push(...dataItem);
+    return totalData;
+  },
+  async scrapePage(page, browser, currentPage, lastPage, totalData) {
+    // start scrapping itemsssss
+    for (currentPage = currentPage; currentPage <= lastPage; currentPage++) {
+      itemLinks = await page.evaluate(() => {
+        const productItemUrls = Array.from(
+          document.querySelectorAll(".Bm3ON .Ms6aG .qmXQo ._95X4G a"),
+          (element) => element.href
+        );
+        return productItemUrls;
+      });
+      for (i = 0; i < itemLinks.length; i++) {
+        itemLink = itemLinks[i];
+        itemPage = await browser.newPage();
+        await itemPage.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
+        console.log(`Navigating to ` + itemLink);
+        try {
+          this.getProductDetails(browser, itemPage, totalData);
+          await this.sleep(5000);
+        } catch (err) {
+          failedUrl.push({
+            itemLink,
+          });
+        }
+      }
+      await page.goto(
+        `https://www.lazada.com.my/lucky-pharmacy-malaysia/?from=wangpu&langFlag=en&page=${currentPage}&pageTypeId=2&q=All-Products`,
+        { waitUntil: "domcontentloaded" }
+      );
+    }
     return totalData;
   },
 };
