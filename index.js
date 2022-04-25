@@ -79,7 +79,7 @@ const scraperObject = {
         await itemPage.setViewport({ width: 1366, height: 768 }); //setting wider viewport to load all products
         await itemPage.goto(itemLink, { waitUntil: "domcontentloaded" });
         console.log(`Navigating to ` + itemLink);
-        await this.getProductDetails(itemPage, totalData);
+        await this.getProductDetails(browser, itemPage, totalData);
         await itemPage.close();
       }
       await page.goto(
@@ -110,7 +110,17 @@ const scraperObject = {
         return false;
       });
   },
-  async getProductDetails(page, totalData) {
+  async getProductDetails(browser, page, totalData) {
+    // waiter not exceed 10 pages
+    while ((await browser.pages()).length >= 10) {}
+
+    // while (this.isCaptcha) {
+    //   console.log("captcha detected");
+    //   console.log("itemLink = " + itemLink);
+    //   // await page.reload({ waitUntil: "networkidle0", timeout: 0 });
+    //   page.close()
+    //   return
+    // }
     const dataOfItem = await page.evaluate(() => {
       const title = document.querySelector(
         ".pdp-mod-product-badge-title"
