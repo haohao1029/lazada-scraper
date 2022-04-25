@@ -53,8 +53,14 @@ const scraperObject = {
       return paginationBtns[paginationBtns.length - 1].innerText; // last page
     });
     console.log("start scraping");
-    totalData = await this.scrapePage(page, browser, currentPage, lastPage, totalData);
-    console.log(totalData)
+    totalData = await this.scrapePage(
+      page,
+      browser,
+      currentPage,
+      lastPage,
+      totalData
+    );
+    console.log(totalData);
     console.log("scraping done");
     console.log("import into files");
 
@@ -113,9 +119,12 @@ const scraperObject = {
       const title = document.querySelector(
         ".pdp-mod-product-badge-title"
       ).innerText;
-      const rating = document
+      let rating = document
         .querySelector(".pdp-review-summary__link")
         .innerText.split(" ")[0];
+      if (rating == "No") {
+        rating = 0;
+      }
       let price = document.querySelector(".pdp-price").innerText;
       let modelName = "";
       if (document.querySelector(".sku-name")) {
@@ -166,7 +175,7 @@ const scraperObject = {
         console.log(`Navigating to ` + itemLink);
         try {
           this.getProductDetails(browser, itemPage, totalData);
-          await this.sleep(5000);
+          await this.sleep(10000);
         } catch (err) {
           failedUrl.push({
             itemLink,
